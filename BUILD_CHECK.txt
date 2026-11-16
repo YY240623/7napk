@@ -1,0 +1,18 @@
+7NKernel Android 1.5.0 RC — Build Check
+
+Source-level changes:
+- App version: 1.5.0 (versionCode 6)
+- Compose UI version label reads BuildConfig.VERSION_NAME.
+- Destructive reset requires explicit confirmation.
+- Optional minified release build uses CI-provided signing secrets only.
+- 10 JVM unit test methods are declared.
+
+Environment limitations:
+- This environment does not have a usable Gradle executable or Android SDK.
+- No Android Gradle Plugin configuration, Kotlin Android compilation, JVM JUnit execution,
+  Android Lint, APK assembly, emulator test, or physical-device test has been performed here.
+- The GitHub Actions workflow must be run in the user's repository to establish build validity.
+
+Safety:
+- No kernel flashing, game injection, cheating, anti-cheat bypass, or recording-evasion features.
+- 235 catalog entries remain explicitly non-linked placeholders.

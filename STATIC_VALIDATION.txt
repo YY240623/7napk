@@ -1,0 +1,11 @@
+7NKernel Android 1.5.0 RC static validation
+
+- Version 1.5.0 / code 6 configured in app Gradle settings
+- UI version label reads generated BuildConfig.VERSION_NAME
+- 12 parameter categories, 243 entries, 8 effective and 235 placeholders
+- 10 JVM unit test methods declared
+- Import validation remains atomic and bounded to 1 MB
+- Destructive reset protected by confirmation dialog
+- Optional Release build uses repository signing secrets, never committed credentials
+
+Static checks do not replace Android compilation, JUnit execution, Lint, APK assembly, or device testing.
