@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>7NKernel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23ffffff'/%3E%3Ctext x='16' y='23' font-size='16' font-family='sans-serif' font-weight='bold' fill='%230071e3' text-anchor='middle'%3E7N%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --text:#1c1c1e;
+  --text-muted:rgba(60,60,67,0.62);
+  --accent-green:#34c759;
+  --accent-blue:#0071e3;
+  --mint-green:#0b8a70;
+
+  /* 液态玻璃核心变量 */
+  --g-blur: 40px;
+  --g-alpha: 0.78;
+  --g-saturate: 200%;
+  --g-contrast: 100%;
+  --g-brightness: 100%;
+  --g-border-alpha: 0.06;
+  --g-radius: 24px;
+  --g-highlight: 1px;
+
+  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, var(--g-alpha)) 0%, rgba(255, 255, 255, calc(var(--g-alpha) / 3)) 100%);
+--glass-border: rgba(0, 0, 0, var(--g-border-alpha));
+  --glass-blur: blur(var(--g-blur)) saturate(var(--g-saturate)) contrast(var(--g-contrast)) brightness(var(--g-brightness));
+  --glass-shadow: 0 10px 28px -10px rgba(15,23,42,0.14), inset 0 var(--g-highlight) 1px rgba(255,255,255,0.9), inset 0 -1px 1px rgba(0,0,0,0.02);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;margin:0;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","SF Pro Icons","PingFang SC","Hiragino Sans GB","Helvetica Neue","Helvetica",system-ui,sans-serif;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  background:#f5f5f7; color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none;
+}
+
+/* 金色本体 + 白色柔光（随机循环） */
+.text-gradient-gold{
+  position: relative; display: inline-block;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", Helvetica, system-ui, sans-serif;
+font-weight: 600; letter-spacing: -0.022em;
+  background-image: linear-gradient(99deg, #8a5f0d 0%, #b98a24 16%, #e0b45a 34%, #f7dc9b 50%, #d0a038 68%, #96690f 86%, #c1932a 100%);
+  background-size: 170% auto;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  animation: goldShimmer 8s ease-in-out infinite alternate;
+  filter: drop-shadow(0 1px 2px rgba(122, 82, 8, 0.16));
+}
+/* 覆盖层：只画彩色光带，透明处露出金色本体 */
+.gold-sheen{
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  pointer-events: none; white-space: nowrap;
+  background-image: linear-gradient(100deg,
+    transparent 0%, transparent 38%,
+    rgba(255,255,255,0.18) 44%, rgba(255,255,255,0.72) 49%, rgba(255,255,255,0.98) 52%,
+    rgba(255,255,255,0.72) 55%, rgba(255,255,255,0.18) 60%,
+    transparent 66%, transparent 100%);
+  background-size: 270% 100%;
+  background-repeat: no-repeat;
+  background-position: 0% 50%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+@keyframes goldShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+.text-gradient-gold::selection{ -webkit-text-fill-color: #1c1c1e; }
+
+@keyframes flowGradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.text-gradient-flow{
+  background: linear-gradient(90deg, #0071e3, #4f8cff, #8b5cf6, #ff4d6d, #0071e3);
+  background-size: 300% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: flowGradient 4s linear infinite; filter: drop-shadow(0 1px 2px rgba(0, 80, 180, 0.12));
+}
+
+.bg{ position:fixed;inset:0;z-index:0; background-color: #f5f5f7; background-image: radial-gradient(120% 55% at 50% 0%, #ffffff 0%, rgba(255,255,255,0) 72%), radial-gradient(90% 40% at 82% 100%, rgba(0,113,227,0.05) 0%, rgba(0,113,227,0) 70%); background-size:cover; background-position:center; background-repeat:no-repeat; transition: background-image 0.5s ease; }
+.glass, .card, .tabbar{
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow); position: relative; overflow: hidden; border-radius: var(--g-radius);
+}
+.card{ padding: 16px; margin-bottom: 14px; }
+
+.app{position:relative;z-index:10;height:100%;display:flex;flex-direction:column;}
+main{flex:1;position:relative;overflow:hidden;}
+.view{ position:absolute;inset:0; padding:calc(env(safe-area-inset-top) + 20px) 20px calc(100px + env(safe-area-inset-bottom)); overflow-y:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; opacity:0; transform:translateY(20px); pointer-events:none; transition:opacity 0.3s ease,transform 0.35s ease; }
+.view::-webkit-scrollbar{display:none;}
+.view.active{opacity:1;transform:translateY(0);pointer-events:auto;}
+.view-inner { max-width: 680px; margin: 0 auto; width: 100%; }
+
+.page-title{margin-bottom:20px;}
+.page-title h1{font-size:26px;font-weight:800;margin:0 0 4px;letter-spacing:1px;}
+.page-title p{font-size:12px;color:var(--text-muted);margin:0;}
+
+/* ================= 主页 ================= */
+#view-home { padding-bottom: calc(108px + env(safe-area-inset-bottom)) !important; }
+#view-home .page-title{margin-bottom:16px;}
+#view-home .view-inner { margin: 0; max-width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+.home-top-row { display: flex; gap: 12px; width: 100%; max-width: 300px; margin-bottom: 16px; align-items: stretch; }
+#view-home .card.announce { flex: 1; margin-bottom: 0; display: flex; align-items: center; padding: 12px 14px; min-width:0; }
+#view-home .card.announce .icon-box { width: 32px; height: 32px; font-size: 16px; border-radius: 10px; margin-right: 10px; background: rgba(0,0,0,0.045); display: grid; place-items: center; flex-shrink: 0; color:#1c1c1e; }
+#view-home .card.announce .icon-box svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+#view-home .announce-text { min-width: 0; }
+#view-home .announce-text h4 { font-size: 11px; color: #1b7a3f; font-weight:700; margin: 0; }
+#view-home .announce-text p { font-size: 14px; font-weight: 700; margin: 2px 0; }
+#view-home .announce-text .sub { font-size: 11px; color: var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+#view-home .card.root-card { width: 105px; flex-shrink:0; margin-bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 10px; }
+.root-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.045); display: grid; place-items: center; font-weight: 800; font-size: 14px; color: var(--text-muted); margin-bottom: 6px; transition: all 0.3s; }
+.root-text { font-size: 10.5px; line-height: 1.35; font-weight: 600; color: var(--text-muted); text-align: center; max-width: 100%; word-break: break-word; }
+.root-card.success .root-icon { color: #1b7a3f; background: rgba(52,199,89,0.16); }
+.root-card.success .root-text { color: #1b7a3f; }
+.root-card.denied .root-icon { color: rgba(60,60,67,0.55); background: rgba(0,0,0,0.04); }
+.root-card.denied .root-text { color: rgba(60,60,67,0.65); }
+
+#view-settings .device-list{ max-width:100%; padding:10px 16px; }
+#view-settings .device-item{ display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.07); }
+#view-settings .device-item:last-child{ border-bottom:none; }
+#view-settings .device-item .label{ font-size:13px; font-weight:600; color:var(--text); flex-shrink:0; }
+#view-settings .device-item .value{ font-size:13px; color:var(--text-muted); font-family:monospace; text-align:right; flex:1; min-width:0; margin-left:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#view-home .device-list-title { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; margin-left: 4px; font-weight: 600; }
+#view-home .card.device-list { width: 100%; max-width: 300px; padding: 10px 16px; margin-bottom: 0; }
+#view-home .device-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.07); }
+#view-home .device-item:last-child { border-bottom: none; }
+#view-home .device-item .label { font-size: 13px; font-weight: 600; color: var(--text); flex-shrink:0; }
+#view-home .device-item .value { font-size: 13px; color: var(--text-muted); font-family: monospace; text-align: right; flex: 1; min-width:0; margin-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 分区小标题 */
+.home-quick-title{font-size:13px;color:var(--text-muted);margin:14px 0 8px 4px;font-weight:600;}
+
+/* 游戏悬浮卡片 */
+/* 游戏启动卡片：跟随内容流，不再悬浮遮挡别的模块 */
+.game-widget{ position: relative; width: 100%; max-width: 300px; margin-top: 0; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+#view-home .game-widget{ margin-bottom: 0; }
+.game-header{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.game-info{display:flex;align-items:center;gap:10px; min-width:0;}
+.game-icon{ width: 36px; height: 36px; border-radius: 10px; background:linear-gradient(135deg,#f5a623,#f7ce46); display:grid; place-items:center; font-weight:900; font-size:8px; color:#fff; line-height:1.1; text-align:center; flex-shrink:0; }
+.game-title{font-size:13px;font-weight:700;}
+.game-sub{font-size:10px;color:var(--text-muted);margin-top:2px;}
+.game-state{font-size:10px;font-weight:600;padding:4px 8px;border-radius:8px;background:rgba(255,193,7,0.18);color:#8a5a00;white-space:nowrap;flex-shrink:0;}
+.game-state.ready{background:rgba(52,199,89,0.16);color:#1b7a3f;}
+.game-btn{ width:100%; padding:10px; border-radius:14px; background:#0071e3; border:1px solid rgba(0,113,227,0.55); color:#fff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 6px 14px -6px rgba(0,113,227,0.55); }
+.game-btn:active{ transform: scale(0.97); }
+
+/* 主页使用提示 */
+.tip-card{ width:100%; max-width:300px; padding:4px 16px; }
+.tip-row{ display:flex; gap:10px; padding:12px 0; border-bottom:1px solid rgba(0,0,0,0.07); }
+.tip-row:last-child{ border-bottom:none; }
+.tip-idx{ width:18px;height:18px;border-radius:9px;background:rgba(0,113,227,0.12);color:#0071e3;font-size:11px;font-weight:700;display:grid;place-items:center;flex-shrink:0;margin-top:1px; }
+.tip-text{ font-size:12px;line-height:1.6;color:var(--text-muted); }
+/* ================= 驱动页 ================= */
+#view-driver .kernel-hero-card { background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6); border-radius: 24px; padding: 20px; color: #fff; margin-bottom: 20px; }
+.hero-icon{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,0.2);display:grid;place-items:center;flex-shrink:0;}
+.hero-icon svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.hero-version-box { background: rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+.accordion { background: #ffffff; border-radius: 20px; overflow: hidden; margin-bottom: 20px; border: 1px solid rgba(52,199,89,0.3); }
+.accordion-header { padding: 16px; display: flex; justify-content: space-between; align-items:center; gap:12px; cursor: pointer; }
+.accordion-body { display: none; border-top: 1px solid rgba(0,0,0,0.06); }
+.accordion.open .accordion-body { display: block; }
+.acc-icon{width:44px;height:44px;border-radius:14px;background:rgba(52,199,89,0.15);color:#34c759;display:grid;place-items:center;flex-shrink:0;}
+.acc-icon svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.acc-arrow{color:rgba(60,60,67,0.5);transition:transform .3s;display:grid;place-items:center;}
+.acc-arrow svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.accordion.open .acc-arrow{ transform: rotate(180deg); }
+.driver-item { padding: 16px; display: flex; justify-content: space-between; align-items: center; gap:12px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.driver-item:last-child { border-bottom: none; }
+.btn-flash { background: linear-gradient(180deg, #3b82f6, #2563eb); border: none; color: #fff; padding: 10px 18px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.btn-flash:active { transform: scale(0.95); }
+.btn-flash.active { background: rgba(52,199,89,0.15); color: #34c759; border: 1px solid rgba(52,199,89,0.3); }
+/* ================= 设置页 ================= */
+.setting-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0; border-bottom:1px solid rgba(0,0,0,0.07); cursor:pointer;}
+.setting-item:last-child{border-bottom:none;}
+.setting-item:active{ opacity:0.7; }
+.setting-title{font-size:15px;font-weight:600;margin-bottom:4px;}
+.setting-desc{font-size:12px;color:var(--text-muted);}
+.link-text{color:var(--accent-blue);font-size:13px;font-weight:600;flex-shrink:0;}
+
+/* 底部导航 */
+.tabbar{ position:fixed;left:50%;transform:translateX(-50%); bottom:calc(16px + env(safe-area-inset-bottom)); width:calc(100% - 32px);max-width:600px; display:flex;justify-content:space-around;padding:10px 8px; z-index:50; background: rgba(255,255,255,0.92); box-shadow: 0 10px 30px -12px rgba(15,23,42,0.22), 0 1px 0 rgba(255,255,255,0.9) inset; }
+.tab{ display:flex;flex-direction:column;align-items:center;gap:6px; padding:6px 0;width:80px;border:none;background:none; color:rgba(60,60,67,0.45);font-size:11px;font-weight:500; cursor:pointer; position:relative; z-index:2; }
+.tab svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s;}
+.tab:active svg{ transform: scale(0.85); }
+.tab.active{color:#0071e3;}
+.tab.active svg{ transform: translateY(-2px) scale(1.05); }
+
+/* ================= 液态玻璃控制台 ================= */
+#view-glass { padding: env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom)); background: #f5f5f7; z-index: 150; }
+.glass-header-bar { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; }
+.glass-title-area h1 { font-size: 22px; font-weight: 800; margin: 0; }
+.glass-title-area p { font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0; }
+.glass-header-actions { display: flex; gap: 16px; font-size: 16px; font-weight: 500; color: #1c1c1e; }
+.glass-header-actions span { cursor: pointer; padding:4px 6px; }
+.glass-header-actions span:active{ opacity:0.6; }
+.glass-header-actions .save-btn { color: #0071e3; font-weight: 700; }
+.preview-container { margin: 0 20px 20px 20px; height: 140px; border-radius: 16px; background: linear-gradient(135deg, #4b5563 0%, #8b5cf6 50%, #10b981 100%); position: relative; overflow: hidden; display: flex; align-items: center; padding: 20px; }
+.preview-container::before { content: ""; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 20px); }
+.preview-glass-box { position: relative; z-index: 2; width: 100%; height: 100%; border-radius: var(--g-radius); background: var(--glass-bg); border: 1px solid var(--glass-border); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); padding: 16px; box-shadow: var(--glass-shadow); }
+.preview-glass-box h2 { margin: 0 0 4px 0; font-size: 20px; color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,0.35); }
+.preview-glass-box p { margin: 0; font-size: 12px; color: rgba(255,255,255,0.8); }
+.preview-hint { position: absolute; bottom: 10px; left: 16px; font-size: 11px; color: rgba(255,255,255,0.6); z-index: 3; }
+.search-bar-row { padding: 0 20px; display: flex; gap: 10px; margin-bottom: 16px; }
+.search-input { flex: 1; min-width:0; background: #ffffff; border: 1px solid rgba(0,0,0,0.08); color: #1c1c1e; padding: 12px 16px; border-radius: 12px; font-size: 16px; outline: none; }
+.reset-btn { background: #ffffff; border: 1px solid rgba(0,0,0,0.08); color: #1c1c1e; padding: 0 16px; border-radius: 12px; font-size: 14px; cursor: pointer; flex-shrink:0; }
+.reset-btn:active{ opacity:0.7; }
+.category-tabs { display: flex; overflow-x: auto; scrollbar-width: none; padding: 0 20px; gap: 10px; margin-bottom: 20px; -webkit-overflow-scrolling:touch; }
+.category-tabs::-webkit-scrollbar { display: none; }
+.cat-tab { background: #ffffff; color: var(--text-muted); border: 1px solid transparent; padding: 10px 16px; border-radius: 20px; font-size: 14px; white-space: nowrap; cursor: pointer; transition: all 0.2s; }
+.cat-tab.active { background: #e6efff; color: #0071e3; border-color: rgba(0,113,227,0.28); }
+.sliders-container { padding: 0 20px; }
+.slider-card { background: #ffffff; border: 1px solid rgba(0,0,0,0.06); border-radius: 16px; padding: 16px 20px; margin-bottom: 12px; }
+.slider-header { display: flex; justify-content: space-between; align-items: center; gap:12px; margin-bottom: 16px; }
+.slider-name { font-size: 15px; font-weight: 600; color: #1c1c1e; min-width:0; }
+.slider-value { font-size: 14px; font-family: monospace; color: var(--mint-green); flex-shrink:0; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; outline: none; background: rgba(0,0,0,0.08); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.18); }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border:none; border-radius: 50%; background: #fff; cursor: pointer; }
+.switch-row { display: flex; justify-content: space-between; align-items: center; gap:12px; margin-bottom: 16px; }
+.switch { position: relative; width: 44px; height: 24px; flex-shrink:0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider-sw { position: absolute; inset: 0; background: rgba(0,0,0,0.12); border-radius: 24px; transition: .3s; cursor: pointer; }
+.slider-sw::before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s; }
+input:checked + .slider-sw { background: #34c759; }
+input:checked + .slider-sw::before { transform: translateX(20px); }
+
+/* ================= 灵动岛（黑色药丸 · 左圆角小图 · 右音频条） ================= */
+#dynamicIsland {
+  position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%;
+  height: 38px; width: 38px; padding: 0; gap: 0;
+  transform: translateX(-50%) scale(0.6); opacity: 0; pointer-events: none; overflow: hidden;
+  background: #000; border-radius: 999px; display: flex; align-items: center; justify-content: flex-start;
+  box-shadow: 0 14px 36px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.07);
+z-index: 9999;
+  transition: width 0.55s cubic-bezier(0.22, 1.1, 0.28, 1), padding 0.45s ease, transform 0.5s cubic-bezier(0.25, 1.2, 0.3, 1), opacity 0.25s ease;
+}
+#dynamicIsland.show {
+  width: auto; max-width: 80vw; padding: 0 12px 0 6px;
+  transform: translateX(-50%) scale(1); opacity: 1; pointer-events: auto;
+}
+.di-thumb{
+  width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; margin-left: 0;
+  display: grid; place-items: center; position: relative; overflow: hidden;
+  background: linear-gradient(135deg, #5ac8fa 0%, #0a84ff 55%, #7b5cff 100%);
+  font-size: 11px; font-weight: 900; color: #fff;
+  opacity: 0; transform: scale(0.6);
+  transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease;
+}
+.di-thumb::after{ content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 30% 18%, rgba(255,255,255,0.6), transparent 62%); pointer-events: none; }
+.di-thumb span{ position: relative; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+#dynamicIsland.show .di-thumb { opacity: 1; transform: scale(1); }
+.di-text {
+  font-size: 12.5px; font-weight: 600; color: #fff; white-space: nowrap; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; text-align: left; padding-left: 8px;
+  opacity: 0; transform: translateX(-6px); transition: all 0.35s ease;
+}
+#dynamicIsland.show .di-text { opacity: 1; transform: translateX(0); transition-delay: 0.08s; }
+.di-wave { display: flex; align-items: center; gap: 2.5px; height: 16px; margin-left: 8px; flex-shrink: 0; opacity: 0; transition: opacity 0.3s ease; }
+#dynamicIsland.show .di-wave { opacity: 1; transition-delay: 0.12s; }
+.di-wave i { display: block; width: 2.5px; height: 13px; border-radius: 2px; background: #fff; transform: scaleY(0.4); animation: diBar 0.85s ease-in-out infinite; }
+.di-wave i:nth-child(1){ animation-delay: 0s; }
+.di-wave i:nth-child(2){ animation-delay: 0.1s; height: 16px; }
+.di-wave i:nth-child(3){ animation-delay: 0.2s; height: 10px; }
+.di-wave i:nth-child(4){ animation-delay: 0.3s; height: 16px; }
+.di-wave i:nth-child(5){ animation-delay: 0.4s; }
+@keyframes diBar { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+
+/* ================= 弹窗与开屏 ================= */
+.overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.28); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; z-index: 100; padding: 20px; }
+.overlay.show { opacity: 1; pointer-events: auto; }
+.modal-box { width: 100%; max-width: 400px; max-height: min(82vh, 640px); background: linear-gradient(160deg, #ffffff 0%, #f4f5f8 100%); border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 24px 60px -24px rgba(15,23,42,0.4); border-radius: 24px; padding: 24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left)); display: flex; flex-direction: column; transform: translateY(30px) scale(0.9); opacity: 0; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease; }
+.overlay.show .modal-box { transform: translateY(0) scale(1); opacity: 1; }
+.modal-scroll{overflow-y:auto; scrollbar-width:none; flex:1; margin-bottom:20px; -webkit-overflow-scrolling:touch;}
+.modal-scroll::-webkit-scrollbar{display:none;}
+.mode-item{padding:14px 16px;background:rgba(0,0,0,0.03);border:1px solid rgba(0,0,0,0.08);border-radius:14px;color:rgba(60,60,67,0.75);font-size:14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .2s;}
+.mode-item .mode-dot{width:16px;height:16px;border-radius:50%;border:2px solid #c7c7cc;flex-shrink:0;}
+.mode-item.active{background:rgba(52,199,89,0.12);border-color:rgba(52,199,89,0.45);color:#12402a;}
+.mode-item.active .mode-dot{border:2px solid #34c759;background:#fff;box-shadow:inset 0 0 0 2px #34c759;}
+.mode-item:active{transform:scale(0.98);}
+
+#splash { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; transition: opacity 1.2s cubic-bezier(0.22, 0.61, 0.36, 1), transform 1.2s cubic-bezier(0.22, 0.61, 0.36, 1); }
+#splash.hide { opacity: 0; pointer-events: none; transform: scale(1.1); }
+.ad-container { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(150deg, #ffffff 0%, #eef1f5 100%); transition: opacity 0.85s ease; }
+.ad-container.hide { opacity: 0; pointer-events: none; }
+.eco-graphic { position: relative; width: 120px; height: 120px; margin-bottom: 30px; animation: floatGraphic 2s ease-in-out infinite; }
+@keyframes floatGraphic { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.eco-circle { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(52, 199, 89, 0.3); box-shadow: 0 0 30px rgba(52, 199, 89, 0.2); animation: spinEco 8s linear infinite; }
+.eco-leaf { position: absolute; inset: 20px; border-radius: 50%; background: radial-gradient(circle, rgba(52,199,89,0.2) 0%, transparent 70%); display: grid; place-items: center; }
+.eco-leaf svg { width: 48px; height: 48px; fill: #34c759; }
+@keyframes spinEco { 100% { transform: rotate(360deg); } }
+.ad-tag { font-size: 11px; color: rgba(60,60,67,0.55); border: 1px solid rgba(0,0,0,0.12); padding: 3px 8px; border-radius: 4px; margin-bottom: 16px; }
+.ad-title { font-size: 24px; font-weight: 800; color: #1c1c1e; margin: 0 0 12px; }
+.ad-subtitle { font-size: 13px; color: rgba(60,60,67,0.6); margin: 0; }
+.ad-progress { position: absolute; bottom: 10%; width: 60px; height: 2px; background: rgba(0,0,0,0.1); overflow: hidden; border-radius: 2px;}
+.ad-progress::after { content: ""; display: block; width: 100%; height: 100%; background: var(--accent-green); transform-origin: left; animation: progressFill 2.6s linear both; }
+@keyframes progressFill { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+
+.brand-container { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transform: scale(0.94); filter: blur(12px); transition: opacity 1.05s ease, transform 1.05s cubic-bezier(0.16, 0.84, 0.44, 1), filter 1.05s ease; overflow: hidden; }
+.brand-container.show { opacity: 1; transform: scale(1); filter: blur(0); }
+.splash-logo { width: 100px; height: 100px; border-radius: 30px; display: grid; place-items: center; background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08); margin-bottom: 20px; z-index: 2; transition: transform 1.1s cubic-bezier(0.34, 1.3, 0.64, 1), filter 1.1s ease, opacity 1s ease; }
+.splash-logo span { font-size: 32px; font-weight: 800; }
+.splash-text { font-size: 22px; font-weight: 800; letter-spacing: 3px; z-index: 2; transition: transform 1.1s cubic-bezier(0.34, 1.3, 0.64, 1), filter 1.1s ease, opacity 1s ease; }
+#splash.hide .splash-logo { transform: scale(1.5); filter: blur(15px); opacity: 0; }
+#splash.hide .splash-text { transform: translateY(-20px); filter: blur(10px); opacity: 0; }
+.brand-container.show .splash-logo { animation: brandPop 1.05s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes brandPop { 0% { transform: scale(0.88); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
+.particle-layer { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.particle { position: absolute; border-radius: 50%; opacity: 0; animation: particleFloat 3s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
+@keyframes particleFloat { 0% { opacity: 0; transform: translateY(0) scale(0.5); } 20% { opacity: 1; transform: translateY(-20px) scale(1.2); } 100% { opacity: 0; transform: translateY(-80px) scale(0); } }
+</style>
+</head>
+<body>
+
+<div class="bg" id="appBg"></div>
+
+<!-- 灵动岛 -->
+<div id="dynamicIsland">
+  <div class="di-thumb" id="diThumb"><span id="diGlyph">✓</span></div>
+  <div class="di-text" id="diText">操作成功</div>
+  <div class="di-wave"><i></i><i></i><i></i><i></i><i></i></div>
+</div>
+
+<!-- 开屏 -->
+<div id="splash">
+  <div class="ad-container" id="adScreen">
+    <div class="eco-graphic">
+      <div class="eco-circle"></div>
+      <div class="eco-leaf"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div>
+</div>
+    <div class="ad-tag">公益广告</div>
+    <h2 class="ad-title">守护绿色，从我做起</h2>
+    <p class="ad-subtitle">践行低碳生活，共建美好家园</p>
+    <div class="ad-progress"></div>
+  </div>
+
+  <div class="brand-container" id="brandScreen">
+    <div class="particle-layer" id="particleLayer"></div>
+    <div class="splash-logo"><span class="text-gradient-flow">7N</span></div>
+    <div class="splash-text text-gradient-flow">欢迎使用 7NKernel</div>
+  </div>
+</div>
+
+<!-- 弹窗：启动配置 -->
+<div class="overlay" id="configModal">
+  <div class="modal-box">
+    <h2 style="margin:0 0 20px 0;font-size:20px;">启动配置·和平精英</h2>
+
+    <div class="modal-scroll">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:rgba(60,60,67,0.65);">已识别底层驱动</div>
+      <div id="activeDriverDisplay" style="padding:16px;border-radius:16px;background:rgba(52,199,89,0.15);border:1px solid #34c759;display:flex;justify-content:space-between;align-items:center;margin-bottom: 20px;">
+        <div style="min-width:0;">
+          <div style="font-size:16px;font-weight:700;color:#1c1c1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="activeDriverName">暂无</div>
+<div style="font-size:12px;color:#1b7a3f;margin-top:4px;">状态已就绪</div>
+        </div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#34c759;box-shadow:0 0 10px #34c759;flex-shrink:0;margin-left:10px;"></div>
+      </div>
+
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;color:rgba(60,60,67,0.65);">功能模式</div>
+      <div id="modeGroup" style="display:flex;flex-direction:column;gap:10px;margin-bottom: 20px;">
+        <div class="mode-item" data-mode="内核触摸断点追锁"><span class="mode-dot"></span>内核触摸断点追锁</div>
+        <div class="mode-item active" data-mode="陀螺仪断点追锁"><span class="mode-dot"></span>陀螺仪断点追锁</div>
+      </div>
+
+      <div class="switch-row">
+        <span style="font-size:15px;font-weight:600;">模型掩体判断</span>
+        <label class="switch"><input type="checkbox" id="toggleCover"><span class="slider-sw"></span></label>
+      </div>
+      <div class="switch-row">
+        <span style="font-size:15px;font-weight:600;">程序保留后台</span>
+        <label class="switch"><input type="checkbox" id="toggleBg"><span class="slider-sw"></span></label>
+</div>
+      <div class="switch-row" style="margin-bottom:0;">
+        <span style="font-size:15px;font-weight:600;">屏幕防录屏</span>
+        <label class="switch"><input type="checkbox" id="toggleRecord" checked><span class="slider-sw"></span></label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;">
+      <button onclick="closeModal('configModal')" style="flex:1;padding:14px;border-radius:16px;background:#f1f2f5;color:#1c1c1e;border:1px solid rgba(0,0,0,0.06);font-size:15px;font-weight:600;cursor:pointer;">取消</button>
+      <button onclick="saveAndLaunch()" style="flex:2;padding:14px;border-radius:16px;background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(52,199,89,0.28);cursor:pointer;">保存并启动</button>
+    </div>
+  </div>
+</div>
+
+<!-- 弹窗：上次配置 -->
+<div class="overlay" id="confirmModal">
+  <div class="modal-box" style="text-align:center;">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(52,199,89,0.15);color:#34c759;display:grid;place-items:center;font-size:24px;margin:0 auto 16px;">✓</div>
+<h2 style="margin:0 0 12px 0;font-size:18px;">使用上次配置</h2>
+    <div id="confirmDetail" style="font-size:13px;color:rgba(60,60,67,0.65);line-height:1.8;margin-bottom:20px;text-align:left;padding:0 10px;"></div>
+    <div style="display:flex;gap:12px;">
+      <button onclick="reConfig()" style="flex:1;padding:14px;border-radius:16px;background:#f1f2f5;color:#1c1c1e;border:1px solid rgba(0,0,0,0.06);font-size:15px;font-weight:600;cursor:pointer;">重新配置</button>
+      <button onclick="confirmLaunch()" style="flex:1;padding:14px;border-radius:16px;background:#34c759;color:#fff;border:none;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(52,199,89,0.28);cursor:pointer;">确认使用</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <main>
+    <!-- 主页 -->
+    <section class="view active" id="view-home">
+      <div class="view-inner">
+        <div class="page-title"><h1 class="text-gradient-gold" data-text="7NKernel">7NKernel</h1></div>
+
+        <div class="home-top-row">
+          <div class="card announce">
+<div class="icon-box">
+              <svg viewBox="0 0 24 24"><path d="M4 10v4a1 1 0 0 0 1 1h2l4 4V5l-4 4H5a1 1 0 0 0-1 1z"/><path d="M16 8.5a4 4 0 0 1 0 7"/></svg>
+            </div>
+            <div class="announce-text">
+              <h4>官方公告</h4>
+              <p>云通告</p>
+              <div class="sub">暂无新公告</div>
+            </div>
+          </div>
+          <div class="card root-card" id="rootCard" onclick="checkRoot()">
+            <div class="root-icon" id="rootIcon">R</div>
+            <div class="root-text" id="rootText">正在识别</div>
+          </div>
+        </div>
+
+        <div class="device-list-title">当前设备信息</div>
+        <div class="card device-list">
+          <div class="device-item"><span class="label">设备型号</span><span class="value" id="dev-model">正在获取...</span></div>
+          <div class="device-item"><span class="label">系统版本</span><span class="value" id="dev-sys">正在获取...</span></div>
+          <div class="device-item"><span class="label">系统架构</span><span class="value" id="dev-arch">正在获取...</span></div>
+<div class="device-item"><span class="label">应用软件</span><span class="value">APK 2.3.2</span></div>
+        </div>
+
+        <div class="home-quick-title" style="margin-top:20px;">游戏启动</div>
+        <div class="game-widget glass" id="gameWidget">
+          <div class="game-header">
+            <div class="game-info">
+              <div class="game-icon">和平<br>精英</div>
+              <div><div class="game-title">和平精英</div><div class="game-sub">国服</div></div>
+            </div>
+            <span class="game-state" id="gameState">未加载驱动</span>
+          </div>
+          <button class="game-btn" onclick="handleLaunch()">启动游戏</button>
+        </div>
+
+        <div class="home-quick-title" style="margin-top:22px;">使用提示</div>
+        <div class="card tip-card">
+          <div class="tip-row"><span class="tip-idx">1</span><span class="tip-text">先到「驱动」页刷入驱动，再启动游戏；未刷入驱动只会给出提示。</span></div>
+          <div class="tip-row"><span class="tip-idx">2</span><span class="tip-text">243 项外观参数里只有 8 项真正生效，其余用于预览演示。</span></div>
+</div>
+      </div>
+    </section>
+
+    <!-- 驱动页 -->
+    <section class="view" id="view-driver">
+      <div class="view-inner">
+        <div class="page-title"><h1>驱动管理</h1><p>自动识别底层内核</p></div>
+
+        <div class="kernel-hero-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="display:flex;gap:12px;align-items:center;">
+              <div class="hero-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</div>
+              <div><div style="font-size:12px;opacity:0.8;">驱动管理</div><h2 style="font-size:20px;margin:2px 0 0;font-weight:800;">内核驱动模块</h2></div>
+            </div>
+          </div>
+          <div class="hero-version-box" style="margin-top:16px;">
+            <span style="font-size:12px;opacity:0.8;">当前内核版本</span>
+            <h3 id="detectedKernelVersion" style="font-size:26px;margin:4px 0 0 0;font-weight:800;">检测中...</h3>
+          </div>
+        </div>
+
+        <div class="accordion open" id="driverAccordion">
+          <div class="accordion-header" onclick="toggleAccordion()">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+              <div class="acc-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9h10M7 13h6"/></svg>
+              </div>
+              <div style="min-width:0;"><h3 style="margin:0;font-size:16px;font-weight:800;">内核 6.1 系列</h3><p style="margin:4px 0 0;font-size:12px;color:rgba(60,60,67,0.65);">已匹配当前内核</p></div>
+</div>
+            <span class="acc-arrow"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
+          </div>
+          <div class="accordion-body">
+            <div class="driver-item">
+              <div><h4 style="margin:0 0 4px 0;font-size:15px;">驱动 A</h4><p style="margin:0;font-size:12px;color:rgba(60,60,67,0.65);">标准方案</p></div>
+              <button class="btn-flash" id="btn-driver-A" onclick="flashDriver(this, '驱动A')">刷入</button>
+            </div>
+            <div class="driver-item">
+              <div><h4 style="margin:0 0 4px 0;font-size:15px;">驱动 B</h4><p style="margin:0;font-size:12px;color:rgba(60,60,67,0.65);">备用方案</p></div>
+              <button class="btn-flash" id="btn-driver-B" onclick="flashDriver(this, '驱动B')">刷入</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 设置页 -->
+    <section class="view" id="view-settings">
+      <div class="view-inner">
+        <div class="page-title"><h1 class="text-gradient-gold" data-text="7NKernel">7NKernel</h1><p>应用信息与版本</p></div>
+<div class="card">
+          <div class="setting-item" onclick="openGlassPage()">
+            <div><div class="setting-title">液态玻璃外观</div><div class="setting-desc">实时预览 · <span class="param-count">243</span> 项调节</div></div>
+            <span class="link-text">调整 &gt;</span>
+          </div>
+        </div>
+        <div class="card" style="padding-top:4px;padding-bottom:4px;">
+          <div class="setting-item" onclick="showVersionInfo()">
+            <div><div class="setting-title">版本信息</div><div class="setting-desc" id="appVersionDesc">APK 2.3.2 · 正在读取内核</div></div>
+            <span class="link-text">查看 &gt;</span>
+          </div>
+          <div class="setting-item" onclick="resetAllConfig()">
+            <div><div class="setting-title">恢复默认配置</div><div class="setting-desc">清空本地保存的驱动与启动参数</div></div>
+            <span class="link-text">重置 &gt;</span>
+          </div>
+          <div class="setting-item" onclick="showUsageNotes()">
+            <div><div class="setting-title">使用说明</div><div class="setting-desc">各项功能能用与不能用之处</div></div>
+<span class="link-text">了解 &gt;</span>
+          </div>
+        </div>
+        <div class="device-list-title" style="margin:0 0 8px 4px;">当前状态</div>
+        <div class="card device-list" style="max-width:100%;padding:10px 16px;">
+          <div class="device-item"><span class="label">驱动状态</span><span class="value" id="settingDriver">未加载驱动</span></div>
+          <div class="device-item"><span class="label">启动模式</span><span class="value" id="settingMode">陀螺仪断点追锁</span></div>
+          <div class="device-item"><span class="label">内核版本</span><span class="value" id="settingKernel">读取中</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 液态玻璃控制台 -->
+    <section class="view" id="view-glass">
+      <div class="glass-header-bar">
+        <div class="glass-title-area">
+          <h1>液态玻璃</h1>
+          <p>实时预览 · <span id="totalParamsCount">243</span> 项调节</p>
+        </div>
+        <div class="glass-header-actions">
+          <span onclick="cancelGlassSettings()">取消</span>
+<span class="save-btn" onclick="saveGlassSettings()">保存</span>
+        </div>
+      </div>
+
+      <div class="preview-container">
+        <div class="preview-glass-box">
+          <h2>Liquid Glass</h2>
+          <p>折射 · 色散 · 边缘高光</p>
+        </div>
+
+      </div>
+
+      <div class="search-bar-row">
+        <input type="text" id="searchInput" class="search-input" placeholder="搜索参数名称..." oninput="filterSliders()">
+        <button class="reset-btn" onclick="resetGlassDefaults()">恢复默认</button>
+      </div>
+
+      <div class="category-tabs" id="categoryTabs"></div>
+      <div class="sliders-container" id="slidersContainer"></div>
+    </section>
+
+  </main>
+
+  <nav class="tabbar glass">
+    <button class="tab active" data-target="home"><svg viewBox="0 0 24 24"><path d="M3 11.2 12 4l9 7.2V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>主页</span></button>
+    <button class="tab" data-target="driver"><svg viewBox="0 0 24 24"><rect x="5.5" y="5.5" width="13" height="13" rx="3"/><rect x="9.5" y="9.5" width="5" height="5" rx="1.2"/><path d="M9 5.5V3.2M15 5.5V3.2M9 18.8v2.3M15 18.8v2.3M5.5 9H3.2M5.5 15H3.2M18.5 9h2.3M18.5 15h2.3"/></svg><span>驱动</span></button>
+<button class="tab" data-target="settings"><svg viewBox="0 0 24 24"><path d="M4 7.5h9M17 7.5h3M4 16.5h3M11 16.5h9"/><circle cx="15" cy="7.5" r="2.1"/><circle cx="9" cy="16.5" r="2.1"/></svg><span>设置</span></button>
+  </nav>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ================= 粒子生成器 ================= */
+  function createParticles() {
+    const layer = document.getElementById('particleLayer');
+    if (!layer) return;
+    layer.innerHTML = '';
+    const colors = ['#0071e3', '#4f8cff', '#8b5cf6', '#ff4d6d'];
+    for (let i = 0; i < 40; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 4 + 2;
+      p.style.width = size + 'px'; p.style.height = size + 'px';
+      const left = 50 + (Math.random() - 0.5) * 80;
+      const top = 50 + (Math.random() - 0.5) * 40;
+      p.style.left = left + '%'; p.style.top = top + '%';
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      p.style.background = color; p.style.boxShadow = '0 0 ' + (size * 2) + 'px ' + color;
+p.style.animationDuration = (Math.random() * 2 + 1.5) + 's';
+      p.style.animationDelay = (Math.random() * 1.5) + 's';
+      layer.appendChild(p);
+    }
+  }
+
+  /* ================= 灵动提示 ================= */
+  let diTimer = null;
+  window.showDynamicIsland = function(msg, type) {
+    const di = document.getElementById('dynamicIsland');
+    const text = document.getElementById('diText');
+    const thumb = document.getElementById('diThumb');
+    const glyph = document.getElementById('diGlyph');
+
+    text.innerText = msg;
+    if (type === 'warn') {
+      glyph.innerText = '!';
+      thumb.style.background = 'linear-gradient(135deg, #ffcf3f 0%, #f5a623 60%, #e08600 100%)';
+    } else if (type === 'info') {
+      glyph.innerText = 'i';
+      thumb.style.background = 'linear-gradient(135deg, #5ac8fa 0%, #0a84ff 60%, #3b5bdb 100%)';
+    } else {
+      glyph.innerText = '✓';
+      thumb.style.background = 'linear-gradient(135deg, #7bf0b0 0%, #34c759 55%, #0e9f6e 100%)';
+    }
+
+    di.classList.remove('show');
+void di.offsetWidth;
+    di.classList.add('show');
+
+    clearTimeout(diTimer);
+    diTimer = setTimeout(function(){ di.classList.remove('show'); }, 2600);
+  };
+
+  // 点一下灵动岛即可收起
+  (function(){
+    const di = document.getElementById('dynamicIsland');
+    if (!di) return;
+    di.addEventListener('click', function(){ di.classList.remove('show'); });
+  })();
+
+  /* ================= 开屏 ================= */
+  const splash = document.getElementById('splash');
+  const adScreen = document.getElementById('adScreen');
+  const brandScreen = document.getElementById('brandScreen');
+  /* 时间轴：公益广告至少停留 2.6s，品牌页停留 2.4s，收尾淡出 1.2s */
+  const AD_MIN_MS = 2600;
+  const BRAND_MS = 1900;
+  const BRAND_MS_SKIP = 1150;
+  const SPLASH_FADE_MS = 1300;
+  const splashStart = Date.now();
+
+  let hasSpoken = false, adShown = false, splashClosed = false, closingQueued = false;
+
+  function showBrandScreen() {
+    if (adShown || splashClosed) return;
+    adShown = true;
+    if (adScreen) adScreen.classList.add('hide');
+setTimeout(function(){
+      if (splashClosed) return;
+      if (brandScreen) { brandScreen.classList.add('show'); createParticles(); }
+    }, 560);
+  }
+
+  function doClose() {
+    if (splashClosed) return;
+    splashClosed = true;
+    if (splash) splash.classList.add('hide');
+    setTimeout(function(){ if (splash) splash.style.display = 'none'; }, SPLASH_FADE_MS);
+  }
+
+  // 无论语音结束、点击还是自动流程，都保证：广告 ≥2.6s → 品牌 ≥2.4s → 淡出
+  function closeSplash(byUser) {
+    if (splashClosed || closingQueued) return;
+    closingQueued = true;
+    const adWait = Math.max(0, AD_MIN_MS - (Date.now() - splashStart));
+    setTimeout(function(){
+      if (splashClosed) return;
+      if (!adShown) showBrandScreen();
+      setTimeout(doClose, byUser ? BRAND_MS_SKIP : BRAND_MS);
+    }, adWait);
+  }
+
+  function pickVoice() {
+    if (!('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices() || [];
+    if (!voices.length) return null;
+    return voices.find(function(v){ return /zh[-_]CN/i.test(v.lang) && /xiaoxiao|xiaoyi|ting|female|女/i.test(v.name); })
+|| voices.find(function(v){ return /zh[-_]CN/i.test(v.lang); })
+        || voices.find(function(v){ return /^zh/i.test(v.lang); })
+        || null;
+  }
+
+  function playWelcomeSound() {
+    if (hasSpoken || !('speechSynthesis' in window)) { closeSplash(); return; }
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance('欢迎使用 7NKernel');
+      u.lang = 'zh-CN'; u.rate = 1.0; u.pitch = 1.2;
+      const voice = pickVoice();
+      if (voice) u.voice = voice;
+      u.onend = closeSplash;
+      u.onerror = closeSplash;
+      window.speechSynthesis.speak(u);
+      hasSpoken = true;
+    } catch (e) { closeSplash(); }
+  }
+
+  // 语音列表异步就绪，就绪后再补一次（原先 200ms 时 getVoices 常为空）
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = function(){
+      if (hasSpoken || splashClosed) return;
+      const v = pickVoice();
+      if (v) { hasSpoken = false; try { window.speechSynthesis.cancel(); } catch(e){} playWelcomeSound(); }
+    };
+  }
+setTimeout(playWelcomeSound, 300);
+  setTimeout(showBrandScreen, AD_MIN_MS);
+  setTimeout(closeSplash, AD_MIN_MS + 2600);
+
+  function triggerAudioOnce() {
+    if (!hasSpoken) playWelcomeSound();
+  }
+  document.addEventListener('touchstart', triggerAudioOnce, { passive: true, once: true });
+  document.addEventListener('mousedown', triggerAudioOnce, { once: true });
+  document.addEventListener('pointerdown', triggerAudioOnce, { once: true });
+
+  splash.addEventListener('pointerdown', function(e){
+    e.stopPropagation();
+    triggerAudioOnce();
+    closeSplash(true);
+  });
+
+  /* ================= 页面路由 ================= */
+  const tabs = document.querySelectorAll('.tab');
+  const views = document.querySelectorAll('.view');
+  const tabbar = document.querySelector('.tabbar');
+
+  window.showVersionInfo = function(){
+    const archEl = document.getElementById('dev-arch');
+    const arch = archEl ? archEl.textContent : '未知';
+    showDynamicIsland('APK 2.3.2 · 架构 ' + arch, 'info');
+  };
+
+  window.resetAllConfig = function(){
+try {
+      localStorage.removeItem('7n_glass_params');
+      localStorage.removeItem('7n_pubg_config');
+      localStorage.removeItem('7n_active_driver');
+    } catch(e){}
+    showDynamicIsland('本地配置已清空，刷新后恢复默认', 'info');
+  };
+
+  window.showUsageNotes = function(){
+    showDynamicIsland('243 项里仅 8 项真正作用于样式，驱动为前端模拟', 'info');
+  };
+
+  window.updateVersionDesc = function(){
+    const desc = document.getElementById('appVersionDesc');
+    const archEl = document.getElementById('dev-arch');
+    if (desc && archEl && archEl.textContent && archEl.textContent !== '正在获取...') {
+      desc.textContent = 'APK 2.3.2 · 架构 ' + archEl.textContent;
+    }
+  };
+
+  window.switchView = function(targetId) {
+    views.forEach(function(v){ v.classList.remove('active'); });
+    const target = document.getElementById('view-' + targetId);
+    if (!target) return;
+    target.classList.add('active');
+    target.scrollTop = 0;
+    tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.target === targetId); });
+tabbar.style.display = (targetId === 'glass') ? 'none' : 'flex';
+  };
+  tabs.forEach(function(tab){
+    tab.addEventListener('click', function(){ switchView(tab.dataset.target); });
+  });
+
+  /* ================= 主页交互 ================= */
+  /* ===== Root 权限：进入页面自动识别 ===== */
+  function probeRoot() {
+    const bridges = [window.AndroidBridge, window.Android, window.NativeBridge, window.ksBridge, window._7nBridge];
+    for (let i = 0; i < bridges.length; i++) {
+      const b = bridges[i];
+      if (!b) continue;
+      try {
+        if (typeof b.hasRoot === 'function') return !!b.hasRoot();
+        if (typeof b.isRooted === 'function') return !!b.isRooted();
+        if (typeof b.checkRoot === 'function') return !!b.checkRoot();
+      } catch (e) { /* 桥接调用失败按未获取处理 */ }
+    }
+    return false;
+  }
+
+  function renderRootState(granted, silent) {
+    const card = document.getElementById('rootCard');
+    const icon = document.getElementById('rootIcon');
+    const text = document.getElementById('rootText');
+if (!card || !icon || !text) return;
+    card.classList.toggle('success', granted);
+    card.classList.toggle('denied', !granted);
+    icon.innerText = granted ? '✓' : '!';
+    text.innerText = granted ? '已获取 Root 权限' : '未获取 Root 权限';
+    if (silent) return;
+    showDynamicIsland(
+      granted ? '已获取 Root 权限' : '未检测到 Root 权限，需在已 Root 的设备上运行',
+      granted ? 'success' : 'warn'
+    );
+  }
+
+  window.checkRoot = function() {
+    renderRootState(probeRoot(), false);
+  };
+
+  window.autoDetectRoot = function() {
+    renderRootState(probeRoot(), true);
+  };
+
+  setTimeout(function(){ autoDetectRoot(); }, 600);
+  window.addEventListener('load', function(){ autoDetectRoot(); });
+
+  function detectDeviceInfo() {
+    const ua = navigator.userAgent;
+    let model = '未知设备', sys = '未知系统', arch = '未知架构';
+
+    function archFromUA() {
+      if (/arm64|aarch64|x64|armv8/i.test(ua)) return 'arm64-v8a';
+      if (/armv7|armeabi/i.test(ua)) return 'armeabi-v7a';
+      if (/x86_64|win64|intel/i.test(ua)) return 'x86_64';
+return 'arm64-v8a';
+    }
+
+    if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+      navigator.userAgentData.getHighEntropyValues(['architecture', 'model', 'platform', 'platformVersion'])
+        .then(function(hints){
+          if (hints.architecture) arch = hints.architecture;
+          if (hints.platform) sys = hints.platform + (hints.platformVersion ? ' ' + hints.platformVersion : '');
+          if (hints.model) model = hints.model;
+        })
+        .catch(function(){
+          sys = /Android/i.test(ua) ? 'Android' : (/iPhone|iPad/i.test(ua) ? 'iOS' : 'Web');
+          model = /iPhone/i.test(ua) ? 'iPhone' : (/Android/i.test(ua) ? 'Android Device' : 'Web');
+          arch = archFromUA();
+        })
+        .finally(function(){
+          document.getElementById('dev-model').innerText = model;
+          document.getElementById('dev-sys').innerText = sys;
+          document.getElementById('dev-arch').innerText = arch;
+          if (window.updateVersionDesc) updateVersionDesc();
+});
+    } else {
+      sys = /Android/i.test(ua) ? 'Android' : (/iPhone|iPad/i.test(ua) ? 'iOS' : 'Web');
+      model = /iPhone/i.test(ua) ? 'iPhone' : (/iPad/i.test(ua) ? 'iPad' : (/Android/i.test(ua) ? 'Android Device' : 'Web'));
+      arch = archFromUA();
+      document.getElementById('dev-model').innerText = model;
+      document.getElementById('dev-sys').innerText = sys;
+      document.getElementById('dev-arch').innerText = arch;
+      if (window.updateVersionDesc) updateVersionDesc();
+    }
+  }
+  detectDeviceInfo();
+
+  /* 依据设备信息显示内核版本（原来写死 6.1.57，不会被更新） */
+  function renderKernelVersion() {
+    const arch = document.getElementById('dev-arch').innerText || 'arm64-v8a';
+    const kv = arch.indexOf('arm') >= 0 ? '6.1.57-android14' : '6.6.0-generic';
+    document.getElementById('detectedKernelVersion').innerText = kv;
+    const sk = document.getElementById('settingKernel');
+    if (sk) sk.textContent = kv;
+  }
+  setTimeout(renderKernelVersion, 300);
+
+  window.toggleAccordion = function(){
+const acc = document.getElementById('driverAccordion');
+    acc.classList.toggle('open');
+  };
+
+  /* ================= 驱动联动 ================= */
+  let currentActiveDriver = null;
+  try { currentActiveDriver = localStorage.getItem('7n_active_driver') || null; } catch(e) { currentActiveDriver = null; }
+
+  function updateDriverUI() {
+    const btnA = document.getElementById('btn-driver-A');
+    const btnB = document.getElementById('btn-driver-B');
+    btnA.innerText = '刷入'; btnA.classList.remove('active');
+    btnB.innerText = '刷入'; btnB.classList.remove('active');
+    if (currentActiveDriver === '驱动A') { btnA.innerText = '✓ 已激活'; btnA.classList.add('active'); }
+    else if (currentActiveDriver === '驱动B') { btnB.innerText = '✓ 已激活'; btnB.classList.add('active'); }
+    const sd = document.getElementById('settingDriver');
+    if (sd) sd.textContent = currentActiveDriver || '未加载驱动';
+    updateGameState();
+  }
+
+  function updateGameState() {
+    const badge = document.getElementById('gameState');
+if (!badge) return;
+    if (currentActiveDriver) {
+      badge.innerText = currentActiveDriver + ' 就绪';
+      badge.classList.add('ready');
+    } else {
+      badge.innerText = '未加载驱动';
+      badge.classList.remove('ready');
+    }
+  }
+
+  window.flashDriver = function(btn, driverName) {
+    if (btn.classList.contains('active')) { showDynamicIsland(driverName + ' 已经激活', 'info'); return; }
+    btn.innerText = '注入中...';
+    btn.style.opacity = '0.7';
+    setTimeout(function(){
+      btn.style.opacity = '1';
+      currentActiveDriver = driverName;
+      try { localStorage.setItem('7n_active_driver', driverName); } catch(e){}
+      updateDriverUI();
+      showDynamicIsland(driverName + ' 驱动刷入成功，已设为默认');
+    }, 1200);
+  };
+
+  updateDriverUI();
+
+  /* ================= 启动配置 ================= */
+  let selectedMode = '陀螺仪断点追锁';
+
+  function setMode(mode) {
+    selectedMode = mode;
+    const sm = document.getElementById('settingMode');
+    if (sm) sm.textContent = mode;
+    document.querySelectorAll('#modeGroup .mode-item').forEach(function(el){
+el.classList.toggle('active', el.dataset.mode === mode);
+    });
+  }
+  document.querySelectorAll('#modeGroup .mode-item').forEach(function(el){
+    el.addEventListener('click', function(){ setMode(el.dataset.mode); });
+  });
+
+  function readSavedConfig() {
+    try {
+      const raw = localStorage.getItem('7n_pubg_config');
+      if (!raw) return null;
+      const cfg = JSON.parse(raw);
+      if (!cfg || typeof cfg !== 'object') return null;
+      return cfg;
+    } catch(e) { return null; }
+  }
+
+  window.handleLaunch = function() {
+    if (!currentActiveDriver) {
+      showDynamicIsland('请先在驱动页刷入任意驱动', 'warn');
+      return;
+    }
+
+    const cfg = readSavedConfig();
+    if (cfg && cfg.driver === currentActiveDriver) {
+      setMode(cfg.mode || '陀螺仪断点追锁');
+      document.getElementById('toggleCover').checked = !!cfg.cover;
+      document.getElementById('toggleBg').checked = !!cfg.bg;
+      document.getElementById('toggleRecord').checked = cfg.record !== false;
+
+      document.getElementById('confirmDetail').innerHTML =
+'底层驱动: <strong style="color:#1c1c1e;">' + cfg.driver + '</strong><br>' +
+        '功能模式: ' + (cfg.mode || '陀螺仪断点追锁') + '<br>' +
+        '掩体判断: ' + (cfg.cover ? '开启' : '关闭') + '<br>' +
+        '保留后台: ' + (cfg.bg ? '开启' : '关闭') + '<br>' +
+        '屏幕防录屏: ' + (cfg.record !== false ? '开启' : '关闭');
+      document.getElementById('confirmModal').classList.add('show');
+      return;
+    }
+
+    document.getElementById('activeDriverName').innerText = currentActiveDriver;
+    document.getElementById('toggleCover').checked = false;
+    document.getElementById('toggleBg').checked = false;
+    document.getElementById('toggleRecord').checked = true;
+    setMode('陀螺仪断点追锁');
+    document.getElementById('configModal').classList.add('show');
+  };
+
+  window.closeModal = function(id) { document.getElementById(id).classList.remove('show'); };
+
+  window.reConfig = function() {
+    closeModal('confirmModal');
+    document.getElementById('activeDriverName').innerText = currentActiveDriver;
+    setMode(selectedMode);
+document.getElementById('configModal').classList.add('show');
+  };
+
+  window.saveAndLaunch = function() {
+    const config = {
+      driver: currentActiveDriver,
+      mode: selectedMode,
+      cover: document.getElementById('toggleCover').checked,
+      bg: document.getElementById('toggleBg').checked,
+      record: document.getElementById('toggleRecord').checked
+    };
+    try { localStorage.setItem('7n_pubg_config', JSON.stringify(config)); } catch(e){}
+    closeModal('configModal');
+    executeLaunch();
+  };
+
+  window.confirmLaunch = function() {
+    closeModal('confirmModal');
+    executeLaunch();
+  };
+
+  const GAME_PKG = 'com.tencent.tmgp.pubgmhd';
+
+  // 跳转后如果页面还在前台，说明没有唤起成功，给出提示而不是让用户干等
+  function watchLaunchResult() {
+    let leftPage = false;
+    const mark = function(){ if (document.visibilityState === 'hidden') leftPage = true; };
+    document.addEventListener('visibilitychange', mark);
+    setTimeout(function(){
+      document.removeEventListener('visibilitychange', mark);
+if (!leftPage && document.visibilityState === 'visible') {
+        showDynamicIsland('未能唤起游戏：未安装，或被浏览器拦截了跳转', 'warn');
+      }
+    }, 2600);
+  }
+
+  function executeLaunch() {
+    showDynamicIsland('正在使用 ' + currentActiveDriver + ' 唤醒...');
+    setTimeout(function(){
+      const ua = navigator.userAgent;
+      if (/Android/i.test(ua)) {
+        // 带 browser_fallback_url，没装游戏时不会停在白屏报错页
+        const fallback = 'https://a.app.qq.com/o/simple.jsp?pkgname=' + GAME_PKG;
+        watchLaunchResult();
+        window.location.href = 'intent://launch/#Intent;scheme=pubgmhd;package=' + GAME_PKG +
+          ';S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
+      } else if (/iPhone|iPad|iPod/i.test(ua)) {
+        watchLaunchResult();
+        window.location.href = 'pubgmhd://';
+      } else {
+        showDynamicIsland('当前环境无法唤起游戏（需要安卓或 iOS 真机）', 'warn');
+      }
+    }, 1500);
+  }
+
+  /* ================= 液态玻璃 243 项 ================= */
+  const categories = ["光学与折射", "形状与表面", "边缘高光", "外阴影", "内阴影", "背景与主题", "轨道与触摸光斑", "液滴融合", "胶囊按钮", "液态开关", "液态滑块", "液态标签"];
+let currentCategory = categories[0];
+  const paramsData = [];
+
+  const CORE = [
+    { name: '背景模糊度',      cssVar: '--g-blur',         min: 0,   max: 100, value: 40, unit: 'px', def: 40, group: '光学与折射' },
+    { name: '折射不透明度',    cssVar: '--g-alpha',        min: 0,   max: 100, value: 12, unit: '%',  def: 12, group: '形状与表面' },
+    { name: '滤镜饱和度',      cssVar: '--g-saturate',     min: 100, max: 300, value: 200, unit: '%', def: 200, group: '光学与折射' },
+    { name: '表面对比度',      cssVar: '--g-contrast',     min: 50,  max: 200, value: 100, unit: '%', def: 100, group: '光学与折射' },
+    { name: '全局亮度',        cssVar: '--g-brightness',   min: 50,  max: 200, value: 100, unit: '%', def: 100, group: '光学与折射' },
+    { name: '边缘透明度',      cssVar: '--g-border-alpha', min: 0,   max: 100, value: 15, unit: '%',  def: 15, group: '形状与表面' },
+    { name: '组件圆角',        cssVar: '--g-radius',       min: 0,   max: 40,  value: 24, unit: 'px', def: 24, group: '形状与表面' },
+    { name: '顶部高光',        cssVar: '--g-highlight',    min: 0,   max: 5,   value: 1,  unit: 'px', def: 1,  group: '边缘高光' }
+];
+
+  function initParams() {
+    let idCounter = 1;
+    CORE.forEach(function(c){
+      paramsData.push({
+        id: idCounter++, category: c.group, name: c.name, cssVar: c.cssVar,
+        min: c.min, max: c.max, step: 1, value: c.value, unit: c.unit, def: c.def
+      });
+    });
+    const prefix = ["色散补偿", "焦散偏移", "菲涅尔反射", "漫反射衰减", "高光平滑", "内阴影模糊", "轨道光晕", "水滴张力"];
+    while (idCounter <= 243) {
+      paramsData.push({
+        id: idCounter,
+        category: categories[idCounter % categories.length],
+        name: prefix[idCounter % prefix.length] + ' ' + Math.ceil(idCounter / 10),
+        cssVar: null, min: 0, max: 100, step: 1, value: 50, unit: '', def: 50
+      });
+      idCounter++;
+    }
+  }
+  initParams();
+  document.getElementById('totalParamsCount').innerText = paramsData.length;
+  document.querySelectorAll('.param-count').forEach(function(el){ el.innerText = paramsData.length; });
+
+  const tabsContainer = document.getElementById('categoryTabs');
+  categories.forEach(function(cat){
+const el = document.createElement('div');
+    el.className = 'cat-tab' + (cat === currentCategory ? ' active' : '');
+    el.innerText = cat;
+    el.onclick = function(){
+      document.querySelectorAll('.cat-tab').forEach(function(t){ t.classList.remove('active'); });
+      el.classList.add('active');
+      currentCategory = cat;
+      document.getElementById('searchInput').value = '';
+      renderSliders();
+    };
+    tabsContainer.appendChild(el);
+  });
+
+  const slidersContainer = document.getElementById('slidersContainer');
+
+  function renderSliders() {
+    slidersContainer.innerHTML = '';
+    const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+
+    const currentParams = keyword
+      ? paramsData.filter(function(p){ return p.name.toLowerCase().indexOf(keyword) >= 0; })
+      : paramsData.filter(function(p){ return p.category === currentCategory; });
+
+    if (currentParams.length === 0) {
+      slidersContainer.innerHTML = '<div style="text-align:center;color:rgba(60,60,67,0.5);padding:40px;">没有找到相关参数</div>';
+return;
+    }
+
+    if (currentCategory === '光学与折射' && !keyword) {
+      const wrap = document.createElement('div');
+      wrap.className = 'slider-card';
+      wrap.innerHTML =
+        '<div class="switch-row" style="margin-bottom:0;">' +
+        '<span class="slider-name">色彩增强</span>' +
+        '<label class="switch"><input type="checkbox" id="colorBoost" checked><span class="slider-sw"></span></label>' +
+        '</div>';
+      slidersContainer.appendChild(wrap);
+      wrap.querySelector('input').addEventListener('change', function(e){
+        document.documentElement.style.setProperty('--g-saturate', e.target.checked ? '200%' : '100%');
+        const sat = paramsData.find(function(p){ return p.cssVar === '--g-saturate'; });
+        if (sat) { sat.value = e.target.checked ? 200 : 100; }
+        showDynamicIsland(e.target.checked ? '已开启色彩增强' : '已关闭色彩增强', 'info');
+      });
+    }
+
+    currentParams.forEach(function(p){
+      const card = document.createElement('div');
+      card.className = 'slider-card';
+card.innerHTML =
+        '<div class="slider-header">' +
+        '<span class="slider-name">' + p.name + '</span>' +
+        '<span class="slider-value">' + p.value + p.unit + '</span>' +
+        '</div>' +
+        '<input type="range" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '" value="' + p.value + '">';
+      slidersContainer.appendChild(card);
+
+      const input = card.querySelector('input');
+      const label = card.querySelector('.slider-value');
+      updateSliderBg(input);
+
+      input.addEventListener('input', function(e){
+        const v = parseFloat(e.target.value);
+        p.value = v;
+        label.innerText = v + p.unit;
+        updateSliderBg(input);
+        if (p.cssVar) applyCssVar(p.cssVar, v, p.unit);
+      });
+    });
+  }
+
+  window.filterSliders = function() { renderSliders(); };
+
+  function updateSliderBg(input) {
+    const percent = ((input.value - input.min) / (input.max - input.min)) * 100;
+    input.style.background = 'linear-gradient(to right, #34c759 0%, #34c759 ' + percent + '%, rgba(0,0,0,0.08) ' + percent + '%, rgba(0,0,0,0.08) 100%)';
+}
+
+  function applyCssVar(cssVar, val, unit) {
+    if (cssVar === '--g-alpha' || cssVar === '--g-border-alpha') {
+      document.documentElement.style.setProperty(cssVar, String(val / 100));
+    } else {
+      document.documentElement.style.setProperty(cssVar, unit ? val + unit : String(val));
+    }
+  }
+
+  let stateSnapshot = [];
+  window.openGlassPage = function() {
+    switchView('glass');
+    stateSnapshot = paramsData.map(function(p){ return { id: p.id, value: p.value }; });
+  };
+
+  window.cancelGlassSettings = function() {
+    paramsData.forEach(function(p){
+      const snap = stateSnapshot.find(function(s){ return s.id === p.id; });
+      if (snap) {
+        p.value = snap.value;
+        if (p.cssVar) applyCssVar(p.cssVar, p.value, p.unit);
+      }
+    });
+    document.getElementById('searchInput').value = '';
+    renderSliders();
+    switchView('settings');
+  };
+
+  window.saveGlassSettings = function() {
+    const savedData = paramsData.filter(function(p){ return p.cssVar; })
+      .map(function(p){ return { var: p.cssVar, val: p.value, unit: p.unit }; });
+try { localStorage.setItem('7n_glass_params', JSON.stringify(savedData)); } catch(e){}
+    showDynamicIsland('液态玻璃配置已保存');
+    document.getElementById('searchInput').value = '';
+    switchView('settings');
+  };
+
+  window.resetGlassDefaults = function() {
+    paramsData.forEach(function(p){
+      p.value = p.def;
+      if (p.cssVar) applyCssVar(p.cssVar, p.value, p.unit);
+    });
+    document.getElementById('searchInput').value = '';
+    renderSliders();
+    showDynamicIsland('已恢复默认', 'success');
+  };
+
+  /* 读取已保存外观参数，同时把值回填到滑块，避免“数值变了但滑块还在默认位” */
+  (function restoreGlass(){
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('7n_glass_params') || 'null'); } catch(e) { saved = null; }
+    if (!Array.isArray(saved)) return;
+    saved.forEach(function(item){
+      if (!item || !item.var) return;
+      const p = paramsData.find(function(x){ return x.cssVar === item.var; });
+      const num = Number(item.val);
+      if (!p || !isFinite(num)) return;
+      p.value = num;
+applyCssVar(p.cssVar, p.value, p.unit);
+    });
+  })();
+
+  renderSliders();
+
+  /* ================= 金色标题的随机循环流光 ================= */
+  (function goldSheen(){
+    const nodes = document.querySelectorAll('.text-gradient-gold');
+    if (!nodes.length) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const rnd = function(a, b){ return Math.random() * (b - a) + a; };
+
+    nodes.forEach(function(el, idx){
+      const text = el.getAttribute('data-text') || el.textContent;
+      const ov = document.createElement('span');
+      ov.className = 'gold-sheen';
+      ov.setAttribute('aria-hidden', 'true');
+      ov.textContent = text;
+      if (el.tagName === 'H1') { ov.style.fontSize = 'inherit'; }
+      el.appendChild(ov);
+      el.style.whiteSpace = 'nowrap';
+
+      let delay = rnd(0, 1.6) + idx * 0.4;
+
+      function cycle(){
+        const forward = Math.random() < 0.5;
+        const dur = rnd(1.6, 3.0) * 1000;
+        // 随机起始相位：让光带每次从不同位置进入
+        const startPct = forward ? rnd(-10, 20) : rnd(80, 110);
+        const endPct = forward ? rnd(80, 110) : rnd(-10, 20);
+
+        const anim = ov.animate(
+          [{ backgroundPosition: startPct.toFixed(1) + '% 50%' },
+           { backgroundPosition: endPct.toFixed(1) + '% 50%' }],
+          { duration: dur, easing: 'linear', fill: 'forwards' }
+        );
+        anim.onfinish = function(){
+          setTimeout(cycle, rnd(0.6, 2.6) * 1000);   // 随机停顿后继续，无限循环
+        };
+      }
+
+      setTimeout(cycle, delay * 1000);
+    });
+  })();
+
+})();
+</script>
+</body>
+</html>
